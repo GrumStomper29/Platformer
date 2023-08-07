@@ -36,6 +36,27 @@
     <ClCompile Include="src\model_load.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui.cpp">
+      <Filter>Source Files\Third Party</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_demo.cpp">
+      <Filter>Source Files\Third Party</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_draw.cpp">
+      <Filter>Source Files\Third Party</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_impl_opengl3.cpp">
+      <Filter>Source Files\Third Party</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_tables.cpp">
+      <Filter>Source Files\Third Party</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_widgets.cpp">
+      <Filter>Source Files\Third Party</Filter>
+    </ClCompile>
+    <ClCompile Include="third_party\imgui\imgui_impl_glfw.cpp">
+      <Filter>Source Files\Third Party</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\renderer.hpp">
@@ -53,6 +74,12 @@
       <Filter>Source Files\Shaders</Filter>
     </None>
     <None Include="shaders\uber.vert">
+      <Filter>Source Files\Shaders</Filter>
+    </None>
+    <None Include="shaders\aabb.frag">
+      <Filter>Source Files\Shaders</Filter>
+    </None>
+    <None Include="shaders\aabb.vert">
       <Filter>Source Files\Shaders</Filter>
     </None>
   </ItemGroup>

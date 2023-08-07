@@ -6,6 +6,12 @@
 #include "GLFW/glfw3.h"
 #include "glm/glm.hpp"
 
+//#ifdef RENDERER_USE_IMGUI
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_opengl3.h"
+#include "imgui/imgui_impl_glfw.h"
+//#endif
+
 // temp
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
@@ -21,32 +27,37 @@ void Renderer::init()
 	initOpenGL();
 
 	initPipelines();
+
+	initImgui();
 }
 
-void Renderer::render(const glm::mat4& transform)
+void Renderer::beginFrame()
 {
-	glClearColor(0.5f, 0.0f, 0.0f, 1.0f);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glClearColor(0.6f, 0.8f, 1.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	m_uberPipeline.bind();
-	glBindVertexArray(m_vertexArray);
+	ImGui_ImplGlfw_NewFrame();
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui::NewFrame();
+}
 
-	for (const auto& meshInstance : meshInstances)
+void Renderer::render(const glm::mat4& transform, bool shadowpass, bool executeAABBPass)
+{
+	if (shadowpass)
 	{
-		for (const auto& primitive : m_meshes[meshInstance.mesh].primitives)
-		{
-			glUniform1i(glGetUniformLocation(m_uberPipeline.shaderProgram(), "textured"), primitive.material.hasTexture);
-			glUniformMatrix4fv(glGetUniformLocation(m_uberPipeline.shaderProgram(), "transform"), 1, GL_FALSE, glm::value_ptr(glm::mat4{ transform * (meshInstance.transform * primitive.transform) }));
-			glUniform3fv(glGetUniformLocation(m_uberPipeline.shaderProgram(), "color"), 1, glm::value_ptr(primitive.material.color));
-
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, primitive.material.texture);
-
-			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, primitive.indexBuffer);
-
-			glDrawElements(GL_TRIANGLES, primitive.indexCount, GL_UNSIGNED_INT, nullptr);
-		}
+		this->shadowpass(transform);
 	}
+
+	renderpass(transform);
+	
+	if (executeAABBPass)
+	{
+		aabbpass(transform);
+	}
+
+	ImGui::Render();
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 	glfwPollEvents();
 	glfwSwapBuffers(m_window);
@@ -68,6 +79,8 @@ void Renderer::cleanup()
 			}
 		}
 	}
+
+	ImGui_ImplOpenGL3_Shutdown();
 
 	glfwDestroyWindow(m_window);
 	glfwTerminate();
@@ -116,8 +129,11 @@ void Renderer::finalizeModels()
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
 	glEnableVertexAttribArray(0);
 
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(sizeof(glm::vec3)));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_TRUE, sizeof(Vertex), reinterpret_cast<void*>(sizeof(glm::vec3)));
 	glEnableVertexAttribArray(1);
+
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(sizeof(glm::vec3) + sizeof(glm::vec3)));
+	glEnableVertexAttribArray(2);
 
 	m_vertices.clear();
 	m_vertices.shrink_to_fit();
@@ -133,6 +149,9 @@ void Renderer::initWindow()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+	glfwWindowHint(GLFW_SAMPLES, 8);
+
 	m_window = glfwCreateWindow(m_initialWindowWidth, m_initialWindowHeight, "Platformer", nullptr, nullptr);
 
 	glfwMakeContextCurrent(m_window);
@@ -184,7 +203,10 @@ void Renderer::initOpenGL()
 				}
 			}() };
 
-			std::cerr << sourceStr << ", " << typeStr << ", " << typeStr << ", " << id << ": " << message << '\n';
+			if (type != GL_DEBUG_TYPE_OTHER)
+			{
+				std::cerr << sourceStr << ", " << typeStr << ", " << severityStr << ", " << id << ": " << message << '\n';
+			}
 		},
 		nullptr);
 
@@ -195,9 +217,140 @@ void Renderer::initOpenGL()
 		});
 
 	glEnable(GL_DEPTH_TEST);
+
+	glEnable(GL_MULTISAMPLE);
+
+	glGenFramebuffers(1, &m_shadowFBO);
+
+	glGenTextures(1, &m_shadowMap);
+	glBindTexture(GL_TEXTURE_2D, m_shadowMap);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 1024, 1024, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_shadowMap, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Renderer::initPipelines()
 {
 	m_uberPipeline = { "shaders/uber.vert", "shaders/uber.frag" };
+
+	m_aabbPipeline = { "shaders/aabb.vert", "shaders/aabb.frag" };
+}
+
+void Renderer::initImgui()
+{
+	ImGui::CreateContext();
+	
+	ImGui_ImplGlfw_InitForOpenGL(m_window, true);
+	ImGui_ImplOpenGL3_Init();
+
+	ImGui_ImplOpenGL3_CreateFontsTexture();
+
+	ImGui::StyleColorsLight();
+}
+
+void Renderer::renderpass(const glm::mat4& transform)
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glViewport(0, 0, m_initialWindowWidth, m_initialWindowHeight);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	m_uberPipeline.bind();
+
+	glBindVertexArray(m_vertexArray);
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+	for (const auto& meshInstance : meshInstances)
+	{
+		if (meshInstance.pass == UBER)
+		{
+			if (meshInstance.show)
+			{
+				for (const auto& primitive : m_meshes[meshInstance.mesh].primitives)
+				{
+					glUniform1i(glGetUniformLocation(m_uberPipeline.shaderProgram(), "textured"), primitive.material.hasTexture);
+					glUniformMatrix4fv(glGetUniformLocation(m_uberPipeline.shaderProgram(), "transform"), 1, GL_FALSE, glm::value_ptr(glm::mat4{ transform* (meshInstance.transform* primitive.transform) }));
+					glUniform3fv(glGetUniformLocation(m_uberPipeline.shaderProgram(), "color"), 1, glm::value_ptr(primitive.material.color));
+
+					glActiveTexture(GL_TEXTURE0);
+					glBindTexture(GL_TEXTURE_2D, primitive.material.texture);
+
+					glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, primitive.indexBuffer);
+
+					glDrawElements(GL_TRIANGLES, primitive.indexCount, GL_UNSIGNED_INT, nullptr);
+				}
+			}
+		}
+	}
+}
+
+void Renderer::shadowpass(const glm::mat4& transform)
+{
+	glViewport(0, 0, 1024, 1024);
+	glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	m_uberPipeline.bind();
+
+	glBindVertexArray(m_vertexArray);
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+	for (const auto& meshInstance : meshInstances)
+	{
+		if (meshInstance.pass == UBER)
+		{
+			if (meshInstance.show)
+			{
+				for (const auto& primitive : m_meshes[meshInstance.mesh].primitives)
+				{
+					glUniform1i(glGetUniformLocation(m_uberPipeline.shaderProgram(), "textured"), primitive.material.hasTexture);
+					glUniformMatrix4fv(glGetUniformLocation(m_uberPipeline.shaderProgram(), "transform"), 1, GL_FALSE, glm::value_ptr(glm::mat4{ transform* (meshInstance.transform* primitive.transform) }));
+					glUniform3fv(glGetUniformLocation(m_uberPipeline.shaderProgram(), "color"), 1, glm::value_ptr(primitive.material.color));
+
+					glActiveTexture(GL_TEXTURE0);
+					glBindTexture(GL_TEXTURE_2D, primitive.material.texture);
+
+					glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, primitive.indexBuffer);
+
+					glDrawElements(GL_TRIANGLES, primitive.indexCount, GL_UNSIGNED_INT, nullptr);
+				}
+			}
+		}
+	}
+}
+
+void Renderer::aabbpass(const glm::mat4& transform)
+{
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	m_aabbPipeline.bind();
+
+	for (const auto& meshInstance : meshInstances)
+	{
+		if (meshInstance.pass == AABB)
+		{
+			for (const auto& primitive : m_meshes[meshInstance.mesh].primitives)
+			{
+				glUniformMatrix4fv(glGetUniformLocation(m_aabbPipeline.shaderProgram(), "transform"), 1, GL_FALSE, glm::value_ptr(glm::mat4{ transform* (meshInstance.transform* primitive.transform) }));
+
+				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, primitive.indexBuffer);
+
+				glDrawElements(GL_TRIANGLES, primitive.indexCount, GL_UNSIGNED_INT, nullptr);
+			}
+		}
+	}
 }

@@ -33,7 +33,7 @@ namespace ModelLoader
 				glBindTexture(GL_TEXTURE_2D, outMaterial.texture);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image.image.data());
 				glGenerateMipmap(GL_TEXTURE_2D);
@@ -150,6 +150,7 @@ namespace ModelLoader
 		}
 
 		const unsigned char* positionData{ nullptr };
+		const unsigned char* normalData  { nullptr };
 		const unsigned char* texCoordData{ nullptr };
 		const unsigned char* colorData   { nullptr };
 
@@ -166,6 +167,7 @@ namespace ModelLoader
 				vertexCount = static_cast<int>(bufferView.byteLength) / sizeof(glm::vec3);
 				positionData = buffer.data.data() + bufferView.byteOffset;
 			}
+			else if (attribute.first == "NORMAL") normalData = buffer.data.data() + bufferView.byteOffset;
 			else if (attribute.first == "TEXCOORD_0") texCoordData = buffer.data.data() + bufferView.byteOffset;
 			else if (attribute.first == "COLOR_0") std::cerr << "Color\n";
 		}
@@ -176,6 +178,13 @@ namespace ModelLoader
 			std::memcpy(&position, positionData, sizeof(glm::vec3));
 			positionData += sizeof(glm::vec3);
 
+			glm::vec3 normal{ 0.0f, 1.0f, 0.0f };
+			if (normalData)
+			{
+				std::memcpy(&normal, normalData, sizeof(glm::vec3));
+				normalData += sizeof(glm::vec3);
+			}
+
 			glm::vec2 texCoord{ 0.0f, 0.0f };
 			if (texCoordData)
 			{
@@ -183,7 +192,7 @@ namespace ModelLoader
 				texCoordData += sizeof(glm::vec2);
 			}
 
-			vertices.push_back({ position, texCoord });
+			vertices.push_back({ position, normal, texCoord });
 		}
 
 		return outPrimitive;

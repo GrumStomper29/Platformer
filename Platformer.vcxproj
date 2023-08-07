@@ -65,22 +65,22 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(ProjectDir)/third_party;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)/third_party;$(ProjectDir)/third_party/imgui;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)/third_party;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(ProjectDir)/third_party;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)/third_party;$(ProjectDir)/third_party/imgui;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)/third_party;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(ProjectDir)/third_party;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)/third_party;$(ProjectDir)/third_party/imgui;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)/third_party;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(ProjectDir)/third_party;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)/third_party;$(ProjectDir)/third_party/imgui;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)/third_party;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -141,6 +141,13 @@
     <ClCompile Include="src\pipeline.cpp" />
     <ClCompile Include="src\renderer.cpp" />
     <ClCompile Include="third_party\glad\glad.c" />
+    <ClCompile Include="third_party\imgui\imgui.cpp" />
+    <ClCompile Include="third_party\imgui\imgui_demo.cpp" />
+    <ClCompile Include="third_party\imgui\imgui_draw.cpp" />
+    <ClCompile Include="third_party\imgui\imgui_impl_glfw.cpp" />
+    <ClCompile Include="third_party\imgui\imgui_impl_opengl3.cpp" />
+    <ClCompile Include="third_party\imgui\imgui_tables.cpp" />
+    <ClCompile Include="third_party\imgui\imgui_widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\model_load.hpp" />
@@ -148,6 +155,8 @@
     <ClInclude Include="src\renderer.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\aabb.frag" />
+    <None Include="shaders\aabb.vert" />
     <None Include="shaders\uber.frag" />
     <None Include="shaders\uber.vert" />
   </ItemGroup>
